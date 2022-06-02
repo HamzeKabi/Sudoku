@@ -17,6 +17,7 @@ class Sudoku:
         self.pos_spot_difference = None
         self.shuffled_pos_spot = None
         self.repeated_cells = None
+        self.len_li = None
 
     def game_mode(self, creation_by_human=False, puzzle_generator=False, solve_by_human=False, solve_by_ai=False):
         self.creation_by_human = creation_by_human
@@ -24,7 +25,7 @@ class Sudoku:
         self.solve_by_human = solve_by_human
         self.solve_by_ai = solve_by_ai
         desired_game_mode = '2'
-        #         desired_game_mode = input('Choose which mode:\n1) Puzzle creation by human\n2) Puzzle generator\n3) 
+        #         desired_game_mode = input('Choose which mode:\n1) Puzzle creation by human\n2) Puzzle generator\n3)
         #         Solving puzzle by human\n4) Solving puzzle by A.I\n')
         if desired_game_mode == '1':
             self.board_list = [[f'{y + 1}{x + 1}' for x in range(9)] for y in range(9)]
@@ -110,7 +111,8 @@ class Sudoku:
                         self.board_list[x][y] = 0
             return self.print_board(finished_creation=True)
 
-    def repetition_check(self, rr=None, cc=None, pos=None):
+    def repetition_check(self, rr=None, cc=None, pos=None, empty_cell_filler_func=False):   # empty_cell_filler_func is
+        # for empty_cell_filler function, we need that part of script to run when using this function
         if self.creation_by_human:
             repetitive_row = []
             repetitive_col = []
@@ -153,6 +155,8 @@ class Sudoku:
                     print('\nFix the repeated numbers, for removing a number, substitute with 0\n')
                     return self.get_input()
         elif self.puzzle_generator:
+            self.len_li = False
+
             row_temp_li = []
             if self.board_list[rr].count(self.board_list[rr][cc]) > 1:  # for rows
                 for idx, i in enumerate(self.board_list[rr]):
@@ -160,15 +164,38 @@ class Sudoku:
                         continue
                     elif self.board_list[rr][cc] == i and idx != cc:
                         row_temp_li.append((rr, idx))
-            for j in row_temp_li:
-                self.board_list[j[0]][j[1]] = ' '
+            if len(row_temp_li) > 0:
+                self.len_li = True
+            if not empty_cell_filler_func:
+                for j in row_temp_li:
+                    self.board_list[j[0]][j[1]] = ' '
+
             col_temp_li = []
-            for x in range(9):
+            for x in range(9):  # for columns
                 if self.board_list[x][cc] == self.board_list[rr][cc] and x != rr:
                     col_temp_li.append((x, cc))
-            for i in col_temp_li:
-                self.board_list[i[0]][i[1]] = ' '
-        return self.random_cell_random_number(False, pos + 1)
+            if len(col_temp_li) > 0:
+                self.len_li = True
+            if not empty_cell_filler_func:
+                for i in col_temp_li:
+                    self.board_list[i[0]][i[1]] = ' '
+
+            block_temp_li = []
+            block_centers = [(1, 1), (1, 4), (1, 7), (4, 1), (4, 4), (4, 7), (7, 1), (7, 4), (7, 7)]
+            for center in block_centers:
+                if rr in range(center[0] - 1, center[0] + 2) and cc in range(center[1] - 1, center[1] + 2):
+                    for cell_row in range(center[0] - 1, center[0] + 2):
+                        for cell_col in range(center[1] - 1, center[1] + 2):
+                            if self.board_list[rr][cc] == self.board_list[cell_row][cell_col] and (cell_row, cell_col) \
+                                    != (rr, cc):
+                                block_temp_li.append((cell_row, cell_col))
+            if len(block_temp_li) > 0:
+                self.len_li = True
+            if not empty_cell_filler_func:
+                for i in block_temp_li:
+                    self.board_list[i[0]][i[1]] = ' '
+        if not empty_cell_filler_func:
+            return self.random_cell_random_number(False, pos + 1)
 
     # putting random numbers 1-9 on random empty cells and then checking for repetition and then for solution, \
     # if passed it goes to next cell/number
@@ -179,9 +206,39 @@ class Sudoku:
             return self.repetition_check(self.shuffled_pos_spot[shuffle_pos][0], self.shuffled_pos_spot[shuffle_pos][1],
                                          shuffle_pos)
 
+    def zero_to_whitespace(self):   # converting remaining zeros to whitespace to get assured
+        for x in range(9):
+            for y in range(9):
+                if self.board_list[x][y] == 0:
+                    self.board_list[x][y] = ' '
+
+    def empty_cell_filler(self, cell_r, cell_c):    # filling empty cells with numbers which follow the rules
+        # print((cell_r, cell_c))
+        # if cell_r < 9 and cell_c == 9:
+        #     return self.empty_cell_filler(cell_r + 1, 0)
+        if cell_r < 9 and cell_c < 9:
+            if self.board_list[cell_r][cell_c] == ' ':
+                for num in range(1, 10):
+                    self.board_list[cell_r][cell_c] = num
+                    self.repetition_check(cell_r, cell_c, None, True)
+                    if self.len_li:
+                        print('false num', (cell_r, cell_c), num)
+                    elif not self.len_li:
+                        print('num', (cell_r, cell_c), num)
+                        # print('len_li is True', (cell_r, cell_c), num)
+                        if cell_c + 1 == 9:
+                            return self.empty_cell_filler(cell_r + 1, 0)
+                        return self.empty_cell_filler(cell_r, cell_c + 1)
+                self.board_list[cell_r][cell_c] = ' '
+                if cell_c + 1 == 9:
+                    return self.empty_cell_filler(cell_r + 1, 0)
+                return self.empty_cell_filler(cell_r, cell_c + 1)
+            elif self.board_list[cell_r][cell_c] != ' ':
+                if cell_c + 1 == 9:
+                    return self.empty_cell_filler(cell_r + 1, 0)
+                return self.empty_cell_filler(cell_r, cell_c + 1)
+
     def play(self):
-        print(1)
-        print(1)
         self.game_mode()
         if self.creation_by_human:
             self.print_board()
@@ -189,6 +246,10 @@ class Sudoku:
             self.repetition_check()
         elif self.puzzle_generator:
             self.random_cell_random_number(False, 0)
+            self.zero_to_whitespace()
+            print(1)
+            print(1)
+            self.empty_cell_filler(0, 0)
             self.print_board()
 
 
