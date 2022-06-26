@@ -1,42 +1,40 @@
 # Sudoku game (9*9)
 
 import random
+import time
 
 
 class Sudoku:
-    # def __init__(self):
-    # creating the nested list of cells
-    # self.board_list = [[f'{y + 1}{x + 1}' for x in range(9)] for y in range(9)]
     def __init__(self):
         self.board_list = None
         self.creation_by_human = None
-        self.puzzle_generator = None
-        self.solve_by_human = None
         self.solve_by_ai = None
         self.pos_spot = None
         self.pos_spot_difference = None
         self.shuffled_pos_spot = None
-        self.repeated_cells = None
-        self.len_li = None
+        self.backtrack_li = []
+        self.solved = False
 
-    def game_mode(self, creation_by_human=False, puzzle_generator=False, solve_by_human=False, solve_by_ai=False):
+    def game_mode(self, creation_by_human=False, solve_by_ai=False):
         self.creation_by_human = creation_by_human
-        self.puzzle_generator = puzzle_generator
-        self.solve_by_human = solve_by_human
         self.solve_by_ai = solve_by_ai
-        desired_game_mode = '2'
-        #         desired_game_mode = input('Choose which mode:\n1) Puzzle creation by human\n2) Puzzle generator\n3)
-        #         Solving puzzle by human\n4) Solving puzzle by A.I\n')
+
+        desired_game_mode = input('Choose which mode:\n1) Puzzle creation by human\n2) Solving puzzle by A.I\n')
         if desired_game_mode == '1':
             self.board_list = [[f'{y + 1}{x + 1}' for x in range(9)] for y in range(9)]
             self.creation_by_human = True
         elif desired_game_mode == '2':
-            self.board_list = [[0 for x in range(9)] for y in range(9)]
-            self.pos_spot = [(x, y) for x in range(9) for y in range(9)]
-            self.shuffled_pos_spot = random.sample(self.pos_spot, len(self.pos_spot))
-            self.pos_spot_difference = []
-            self.repeated_cells = []
-            self.puzzle_generator = True
+            self.board_list = [[4, 3, 5, ' ', ' ', ' ', 6, 9, ' '],
+                               [' ', 7, ' ', 3, ' ', 9, 1, ' ', 5],
+                               [' ', ' ', 1, ' ', 5, ' ', 3, ' ', 7],
+                               [' ', ' ', 3, 4, 2, ' ', 8, ' ', ' '],
+                               [8, 6, ' ', 9, ' ', ' ', ' ', ' ', 4],
+                               [5, ' ', 4, ' ', ' ', 3, ' ', 1, ' '],
+                               [7, 4, ' ', 1, 3, ' ', ' ', ' ', ' '],
+                               [6, 1, ' ', 5, 9, ' ', ' ', ' ', ' '],
+                               [' ', ' ', 8, ' ', 6, 4, ' ', ' ', 1]]
+            self.backtrack_li = []
+            self.solve_by_ai = True
 
     def print_board(self, finished_creation=True):
         if finished_creation:
@@ -83,10 +81,8 @@ class Sudoku:
     def get_input(self):
         x = [z for z in input('enter the cell(row column) for finishing creation mode, type f: ').split()]
         if len(x) == 2 and x[0].isdigit() is True and x[1].isdigit() is True:
-            r = int(x[0])
-            c = int(x[1])
-            r -= 1
-            c -= 1
+            r = int(x[0]) - 1
+            c = int(x[1]) - 1
             cell_num = int(input('Enter the cell number, 1-9: '))
             if r not in range(0, 10) or c not in range(0, 10) or cell_num not in range(0, 10):
                 print('Wrong input')
@@ -111,145 +107,123 @@ class Sudoku:
                         self.board_list[x][y] = 0
             return self.print_board(finished_creation=True)
 
-    def repetition_check(self, rr=None, cc=None, pos=None, empty_cell_filler_func=False):   # empty_cell_filler_func is
-        # for empty_cell_filler function, we need that part of script to run when using this function
-        if self.creation_by_human:
-            repetitive_row = []
-            repetitive_col = []
-            repetitive_block = []
-            for idx, row in enumerate(self.board_list):  # checking for duplicate elements in rows
-                for col in row:
-                    if col != 0 and row.count(col) > 1:
-                        repetitive_row.append((idx, col))
+    def rep_check_v1(self):
+        repetitive_row = []
+        repetitive_col = []
+        repetitive_block = []
+        for idx, row in enumerate(self.board_list):  # checking for duplicate elements in rows
+            for col in row:
+                if col != 0 and row.count(col) > 1:
+                    repetitive_row.append((idx, col))
 
-            for x in range(9):  # checking for duplicate elements in column
-                col_temp_list = []  # a temporary list
-                for y in range(9):
-                    col_temp_list.append(self.board_list[y][x])
-                if len(col_temp_list) != len(set(col_temp_list)):
-                    for spot in col_temp_list:
-                        if spot != 0 and col_temp_list.count(spot) > 1:
-                            repetitive_col.append((x, spot))
+        for x in range(9):  # checking for duplicate elements in column
+            col_temp_list = []  # a temporary list
+            for y in range(9):
+                col_temp_list.append(self.board_list[y][x])
+            if len(col_temp_list) != len(set(col_temp_list)):
+                for spot in col_temp_list:
+                    if spot != 0 and col_temp_list.count(spot) > 1:
+                        repetitive_col.append((x, spot))
 
-            # checking for duplicate elements in blocks
-            # list below is the (row, column) address of center of blocks ( 9 blocks in total)
-            block_centers = [(1, 1), (1, 4), (1, 7), (4, 1), (4, 4), (4, 7), (7, 1), (7, 4), (7, 7)]
-            for idx, center in enumerate(block_centers):
-                block_temp_list = []
-                for r in range(center[0] - 1, center[0] + 2):
-                    for c in range(center[1] - 1, center[1] + 2):
-                        block_temp_list.append(self.board_list[r][c])
-                if len(block_temp_list) != len(set(block_temp_list)):
-                    for ce in block_temp_list:
-                        if ce != 0 and block_temp_list.count(ce) > 1:
-                            repetitive_block.append((idx, ce))
+        # checking for duplicate elements in blocks
+        # list below is the (row, column) address of center of blocks ( 9 blocks in total)
+        block_centers = [(1, 1), (1, 4), (1, 7), (4, 1), (4, 4), (4, 7), (7, 1), (7, 4), (7, 7)]
+        for idx, center in enumerate(block_centers):
+            block_temp_list = []
+            for r in range(center[0] - 1, center[0] + 2):
+                for c in range(center[1] - 1, center[1] + 2):
+                    block_temp_list.append(self.board_list[r][c])
+            if len(block_temp_list) != len(set(block_temp_list)):
+                for ce in block_temp_list:
+                    if ce != 0 and block_temp_list.count(ce) > 1:
+                        repetitive_block.append((idx, ce))
 
-                # print(len(repetitive_row), len(repetitive_col), len(repetitive_block))
-                if len(repetitive_row) != 0 or len(repetitive_col) != 0 or len(repetitive_block) != 0:
-                    for spot in set(repetitive_row):
-                        print(f'There are multiple {spot[1]}\'s in row {spot[0] + 1}')
-                    for spot in set(repetitive_col):
-                        print(f'There are multiple {spot[1]}\'s in column {spot[0] + 1}')
-                    for spot in set(repetitive_block):
-                        print(f'There are multiple {spot[1]}\'s in block {spot[0] + 1}')
-                    print('\nFix the repeated numbers, for removing a number, substitute with 0\n')
-                    return self.get_input()
-        elif self.puzzle_generator:
-            self.len_li = False
+            # print(len(repetitive_row), len(repetitive_col), len(repetitive_block))
+            for spot in set(repetitive_row):
+                print(f'There are multiple {spot[1]}\'s in row {spot[0] + 1}')
+            for spot in set(repetitive_col):
+                print(f'There are multiple {spot[1]}\'s in column {spot[0] + 1}')
+            for spot in set(repetitive_block):
+                print(f'There are multiple {spot[1]}\'s in block {spot[0] + 1}')
+            print('\nFix the repeated numbers, for removing a number, substitute with 0\n')
+            return self.get_input()
 
-            row_temp_li = []
-            if self.board_list[rr].count(self.board_list[rr][cc]) > 1:  # for rows
-                for idx, i in enumerate(self.board_list[rr]):
-                    if self.board_list[rr][cc] == i and idx == cc:
-                        continue
-                    elif self.board_list[rr][cc] == i and idx != cc:
-                        row_temp_li.append((rr, idx))
-            if len(row_temp_li) > 0:
-                self.len_li = True
-            if not empty_cell_filler_func:
-                for j in row_temp_li:
-                    self.board_list[j[0]][j[1]] = ' '
-
+    def rep_check_v2(self, rr, cc):
+        self.repetitive = False
+        # for rows
+        if self.board_list[rr].count(self.board_list[rr][cc]) > 1:
+            self.repetitive = True
+        if not self.repetitive:
+            # for columns
             col_temp_li = []
-            for x in range(9):  # for columns
-                if self.board_list[x][cc] == self.board_list[rr][cc] and x != rr:
-                    col_temp_li.append((x, cc))
-            if len(col_temp_li) > 0:
-                self.len_li = True
-            if not empty_cell_filler_func:
-                for i in col_temp_li:
-                    self.board_list[i[0]][i[1]] = ' '
-
+            for x in range(9):
+                col_temp_li.append(self.board_list[x][cc])
+            if col_temp_li.count(self.board_list[rr][cc]) > 1:
+                self.repetitive = True
+        if not self.repetitive:
             block_temp_li = []
             block_centers = [(1, 1), (1, 4), (1, 7), (4, 1), (4, 4), (4, 7), (7, 1), (7, 4), (7, 7)]
             for center in block_centers:
                 if rr in range(center[0] - 1, center[0] + 2) and cc in range(center[1] - 1, center[1] + 2):
                     for cell_row in range(center[0] - 1, center[0] + 2):
                         for cell_col in range(center[1] - 1, center[1] + 2):
-                            if self.board_list[rr][cc] == self.board_list[cell_row][cell_col] and (cell_row, cell_col) \
-                                    != (rr, cc):
-                                block_temp_li.append((cell_row, cell_col))
-            if len(block_temp_li) > 0:
-                self.len_li = True
-            if not empty_cell_filler_func:
-                for i in block_temp_li:
-                    self.board_list[i[0]][i[1]] = ' '
-        if not empty_cell_filler_func:
-            return self.random_cell_random_number(False, pos + 1)
+                            block_temp_li.append(self.board_list[cell_row][cell_col])
+            if block_temp_li.count(self.board_list[rr][cc]) > 1:
+                self.repetitive = True
 
-    # putting random numbers 1-9 on random empty cells and then checking for repetition and then for solution, \
-    # if passed it goes to next cell/number
-    def random_cell_random_number(self, repetitive=False, shuffle_pos=0):
-        if shuffle_pos != len(self.shuffled_pos_spot) - 1:
-            self.board_list[self.shuffled_pos_spot[shuffle_pos][0]][self.shuffled_pos_spot[shuffle_pos][1]] = \
-                random.randint(1, 9)
-            return self.repetition_check(self.shuffled_pos_spot[shuffle_pos][0], self.shuffled_pos_spot[shuffle_pos][1],
-                                         shuffle_pos)
-
-    def zero_to_whitespace(self):   # converting remaining zeros to whitespace to get assured
-        for x in range(9):
-            for y in range(9):
-                if self.board_list[x][y] == 0:
-                    self.board_list[x][y] = ' '
-
-    def empty_cell_filler(self, cell_r, cell_c):    # filling empty cells with numbers which follow the rules
-        # print((cell_r, cell_c))
-        # if cell_r < 9 and cell_c == 9:
-        #     return self.empty_cell_filler(cell_r + 1, 0)
-        if cell_r < 9 and cell_c < 9:
-            if self.board_list[cell_r][cell_c] == ' ':
-                for num in range(1, 10):
-                    self.board_list[cell_r][cell_c] = num
-                    self.repetition_check(cell_r, cell_c, None, True)
-                    if self.len_li:
-                        print('false num', (cell_r, cell_c), num)
-                    elif not self.len_li:
-                        print('num', (cell_r, cell_c), num)
-                        # print('len_li is True', (cell_r, cell_c), num)
-                        if cell_c + 1 == 9:
-                            return self.empty_cell_filler(cell_r + 1, 0)
-                        return self.empty_cell_filler(cell_r, cell_c + 1)
-                self.board_list[cell_r][cell_c] = ' '
-                if cell_c + 1 == 9:
-                    return self.empty_cell_filler(cell_r + 1, 0)
-                return self.empty_cell_filler(cell_r, cell_c + 1)
-            elif self.board_list[cell_r][cell_c] != ' ':
-                if cell_c + 1 == 9:
-                    return self.empty_cell_filler(cell_r + 1, 0)
-                return self.empty_cell_filler(cell_r, cell_c + 1)
+    def solver(self):
+        while True:
+            stop_total_iter = False
+            if not stop_total_iter:
+                for row in range(9):
+                    for col in range(9):
+                        if not stop_total_iter:
+                            if self.board_list[row][col] == ' ':
+                                stop_iter = False
+                                for i in range(1, 10):
+                                    if not stop_total_iter:
+                                        if not stop_iter:
+                                            self.board_list[row][col] = i
+                                            self.rep_check_v2(row, col)
+                                            if self.repetitive:
+                                                self.board_list[row][col] = ' '
+                                                if i == 9:
+                                                    for spot in self.backtrack_li[::-1]:
+                                                        if not stop_total_iter:
+                                                            if spot[-1] == 9:
+                                                                self.board_list[spot[0]][spot[1]] = ' '
+                                                            else:
+                                                                for num in range(spot[-1] + 1, 10):
+                                                                    if not stop_total_iter:
+                                                                        self.board_list[spot[0]][spot[1]] = num
+                                                                        self.rep_check_v2(spot[0], spot[1])
+                                                                        if self.repetitive:
+                                                                            self.board_list[spot[0]][spot[1]] = ' '
+                                                                        else:
+                                                                            self.backtrack_li = self.backtrack_li[:(
+                                                                                self.backtrack_li.index(spot))]
+                                                                            self.backtrack_li.append(
+                                                                                (spot[0], spot[1], num))
+                                                                            stop_total_iter = True
+                                            else:
+                                                self.backtrack_li.append((row, col, i))
+                                                stop_iter = True
+            co = 0
+            for x in range(9):
+                if ' ' in self.board_list[x]:
+                    co = 1
+            if co == 0:
+                self.solved = True
+                break
 
     def play(self):
         self.game_mode()
         if self.creation_by_human:
             self.print_board()
             self.get_input()
-            self.repetition_check()
-        elif self.puzzle_generator:
-            self.random_cell_random_number(False, 0)
-            self.zero_to_whitespace()
-            print(1)
-            print(1)
-            self.empty_cell_filler(0, 0)
+            self.rep_check_v1()
+        elif self.solve_by_ai:
+            self.solver()
             self.print_board()
 
 
